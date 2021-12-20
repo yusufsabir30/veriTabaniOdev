@@ -1,0 +1,1153 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 14.1
+-- Dumped by pg_dump version 14.0
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: daireSahibiTrigger(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public."daireSahibiTrigger"() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+ UPDATE "daireSahibiSayisi" SET "sahipSayisi" = "sahipSayisi"+1;
+ RETURN NEW; 
+END;
+$$;
+
+
+ALTER FUNCTION public."daireSahibiTrigger"() OWNER TO postgres;
+
+--
+-- Name: dairesahibiara(character); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.dairesahibiara(kimliknum character) RETURNS TABLE(tc character, isim character varying, soyisim character varying)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY SELECT "kimlikNo", "sahipAdi", "sahipSoyadi" FROM "daireSahibi"
+                 WHERE "kimlikNo" = kimlikNum;
+END;
+$$;
+
+
+ALTER FUNCTION public.dairesahibiara(kimliknum character) OWNER TO postgres;
+
+--
+-- Name: ilUzunluguTrigger(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public."ilUzunluguTrigger"() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$ 
+DECLARE 
+iluzunlugu INTEGER;
+BEGIN 
+iluzunlugu := (SELECT LENGTH("ilAdi") FROM "il" ORDER BY "siraNumarasi" DESC LIMIT 1);
+
+UPDATE "ilUzunlugu" SET "uzunlukMiktari" = "uzunlukMiktari"+"ilUzunlugu";
+RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public."ilUzunluguTrigger"() OWNER TO postgres;
+
+--
+-- Name: kiraciAdiTrigger(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public."kiraciAdiTrigger"() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW."kiraciAdi" <> OLD."kiraciAdi" THEN
+        INSERT INTO "kiraciAdiTrigger"("sozlesmeNumarasi", "yeniKiraciAdi", "eskiKiraciAdi", "degisiklikTarihi")
+        VALUES(NEW."sozlesmeNo", NEW."kiraciAdi", OLD."kiraciAdi", CURRENT_TIMESTAMP::TIMESTAMP);
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public."kiraciAdiTrigger"() OWNER TO postgres;
+
+--
+-- Name: kiracibilgileri(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.kiracibilgileri() RETURNS text
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    kiraciBilgisi kiraci%ROWTYPE; 
+    sonuc TEXT;
+BEGIN
+    sonuc := '';
+    FOR kiraciBilgisi IN SELECT * FROM kiraci LOOP
+        sonuc := sonuc || kiraciBilgisi."sozlesmeNo" || E'\t' || kiraciBilgisi."kiraciAdi" || E'\r\n';
+    END LOOP;
+    RETURN sonuc;
+END;
+$$;
+
+
+ALTER FUNCTION public.kiracibilgileri() OWNER TO postgres;
+
+--
+-- Name: personelbul(character); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.personelbul(personelno character) RETURNS TABLE(telno character, adi character varying, soyadi character varying)
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    RETURN QUERY SELECT "sicilNo", "personelAdi", "personelSoyadi" FROM personel
+                 WHERE "sicilNo" = personelNo;
+END;
+$$;
+
+
+ALTER FUNCTION public.personelbul(personelno character) OWNER TO postgres;
+
+--
+-- Name: tumkayitlar(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.tumkayitlar() RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+	kayitlar INTEGER;
+BEGIN
+   SELECT COUNT( * ) INTO kayitlar FROM "daireSahibi";
+   RETURN kayitlar;
+END;
+$$;
+
+
+ALTER FUNCTION public.tumkayitlar() OWNER TO postgres;
+
+--
+-- Name: uzunlukTrigger(); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public."uzunlukTrigger"() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$ 
+DECLARE 
+uzunluk INTEGER;
+BEGIN 
+uzunluk := (SELECT LENGTH("sahipAdi") FROM "daireSahibi" ORDER BY "siraNo" DESC LIMIT 1);
+
+UPDATE "daireSahibiUzunlugu" SET "uzunlukSayisi" = "uzunlukSayisi"+"uzunluk";
+RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION public."uzunlukTrigger"() OWNER TO postgres;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: apartman; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.apartman (
+    "apartmanNo" character varying(10) NOT NULL,
+    "apartmanAdi" character varying(40),
+    adres character varying(100),
+    "siteNumarasi" character varying(10) NOT NULL,
+    "kimlikNumarasi" character(11) NOT NULL
+);
+
+
+ALTER TABLE public.apartman OWNER TO postgres;
+
+--
+-- Name: daire; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.daire (
+    "daireNo" character varying NOT NULL,
+    "daireAdi" character varying(40),
+    "apartmanNumarasi" character varying(10) NOT NULL,
+    "kimlikNumarasi" character(11) NOT NULL
+);
+
+
+ALTER TABLE public.daire OWNER TO postgres;
+
+--
+-- Name: apartmanDaire; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public."apartmanDaire" AS
+ SELECT apartman."apartmanNo",
+    apartman."apartmanAdi",
+    apartman.adres,
+    daire."daireNo",
+    daire."daireAdi"
+   FROM (public.apartman
+     JOIN public.daire ON (((apartman."apartmanNo")::text = (daire."apartmanNumarasi")::text)));
+
+
+ALTER TABLE public."apartmanDaire" OWNER TO postgres;
+
+--
+-- Name: apartmanTuru; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public."apartmanTuru" (
+    "turKodu" character(4) NOT NULL,
+    "odaSayisi" integer,
+    "havuzSayisi" integer
+);
+
+
+ALTER TABLE public."apartmanTuru" OWNER TO postgres;
+
+--
+-- Name: daireSahibi; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public."daireSahibi" (
+    "kimlikNo" character(11) NOT NULL,
+    "sahipAdi" character varying(40),
+    "sahipSoyadi" character varying(40),
+    "apartmanNumarasi" character varying(10) NOT NULL,
+    "siraNo" integer
+);
+
+
+ALTER TABLE public."daireSahibi" OWNER TO postgres;
+
+--
+-- Name: daireSahibiSayisi; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public."daireSahibiSayisi" (
+    "sahipSayisi" integer NOT NULL
+);
+
+
+ALTER TABLE public."daireSahibiSayisi" OWNER TO postgres;
+
+--
+-- Name: daireSahibiUzunlugu; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public."daireSahibiUzunlugu" (
+    "uzunlukSayisi" integer NOT NULL
+);
+
+
+ALTER TABLE public."daireSahibiUzunlugu" OWNER TO postgres;
+
+--
+-- Name: daireTuru; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public."daireTuru" (
+    "turNo" character(4) NOT NULL,
+    "salonSayisi" integer,
+    "banyoSayisi" integer
+);
+
+
+ALTER TABLE public."daireTuru" OWNER TO postgres;
+
+--
+-- Name: il; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.il (
+    "ilKodu" character(4) NOT NULL,
+    "ilAdi" character varying(40),
+    "siraNumarasi" integer
+);
+
+
+ALTER TABLE public.il OWNER TO postgres;
+
+--
+-- Name: ilUzunlugu; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public."ilUzunlugu" (
+    "uzunlukMiktarı" integer NOT NULL
+);
+
+
+ALTER TABLE public."ilUzunlugu" OWNER TO postgres;
+
+--
+-- Name: ilce; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.ilce (
+    "ilceKodu" character(4) NOT NULL,
+    "ilceAdi" character varying(40),
+    "ilNo" character(4) NOT NULL
+);
+
+
+ALTER TABLE public.ilce OWNER TO postgres;
+
+--
+-- Name: kiraci; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.kiraci (
+    "sozlesmeNo" character(10) NOT NULL,
+    "kiraciAdi" character varying(40),
+    "kiraciSoyadi" character varying(40),
+    "kimlikNumarasi" character(11) NOT NULL
+);
+
+
+ALTER TABLE public.kiraci OWNER TO postgres;
+
+--
+-- Name: kiraciDaireSahibi; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public."kiraciDaireSahibi" AS
+ SELECT "daireSahibi"."kimlikNo",
+    "daireSahibi"."sahipAdi",
+    "daireSahibi"."sahipSoyadi",
+    kiraci."sozlesmeNo",
+    kiraci."kiraciAdi",
+    kiraci."kiraciSoyadi"
+   FROM (public."daireSahibi"
+     JOIN public.kiraci ON (("daireSahibi"."kimlikNo" = kiraci."kimlikNumarasi")));
+
+
+ALTER TABLE public."kiraciDaireSahibi" OWNER TO postgres;
+
+--
+-- Name: kiraciDegisikligi; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public."kiraciDegisikligi" (
+    "sozlesmeNumarasi" character(10) NOT NULL,
+    "eskiKiraciAdi" character varying(40) NOT NULL,
+    "yeniKiraciAdi" character varying(40) NOT NULL,
+    "degisiklikTarihi" timestamp with time zone NOT NULL
+);
+
+
+ALTER TABLE public."kiraciDegisikligi" OWNER TO postgres;
+
+--
+-- Name: mahalle; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.mahalle (
+    "mahalleKodu" character(4) NOT NULL,
+    "mahalleAdi" character varying(40),
+    "ilNo" character(4) NOT NULL,
+    "ilceNo" character(4) NOT NULL
+);
+
+
+ALTER TABLE public.mahalle OWNER TO postgres;
+
+--
+-- Name: konumBilgisi; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public."konumBilgisi" AS
+ SELECT il."ilKodu",
+    il."ilAdi",
+    ilce."ilceKodu",
+    ilce."ilceAdi",
+    mahalle."mahalleKodu",
+    mahalle."mahalleAdi"
+   FROM ((public.il
+     JOIN public.ilce ON ((il."ilKodu" = ilce."ilNo")))
+     JOIN public.mahalle ON ((il."ilKodu" = mahalle."ilNo")));
+
+
+ALTER TABLE public."konumBilgisi" OWNER TO postgres;
+
+--
+-- Name: personel; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.personel (
+    "sicilNo" character(10) NOT NULL,
+    "personelAdi" character varying(40),
+    "personelSoyadi" character varying(40),
+    "telefonNo" character(11),
+    "siteNumarasi" character varying(10) NOT NULL
+);
+
+
+ALTER TABLE public.personel OWNER TO postgres;
+
+--
+-- Name: site; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.site (
+    "siteNo" character varying(10) NOT NULL,
+    "siteAdi" character varying(40),
+    adres character varying(100),
+    "ilNo" character(4) NOT NULL,
+    "ilceNo" character(4) NOT NULL,
+    "mahalleNo" character(4) NOT NULL
+);
+
+
+ALTER TABLE public.site OWNER TO postgres;
+
+--
+-- Name: siteTuru; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public."siteTuru" (
+    "turNumarasi" integer NOT NULL,
+    "binaSayisi" integer,
+    "sahaSayisi" integer
+);
+
+
+ALTER TABLE public."siteTuru" OWNER TO postgres;
+
+--
+-- Name: turApartman; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public."turApartman" (
+    "apartmanNo" character varying(10) NOT NULL,
+    "turKodu" character(4) NOT NULL,
+    "turAdi" character varying(40)
+);
+
+
+ALTER TABLE public."turApartman" OWNER TO postgres;
+
+--
+-- Name: turDaire; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public."turDaire" (
+    "daireNo" character varying(4) NOT NULL,
+    "turNo" character(4) NOT NULL,
+    "turAdi" character varying(40)
+);
+
+
+ALTER TABLE public."turDaire" OWNER TO postgres;
+
+--
+-- Name: turSite; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public."turSite" (
+    "siteNo" character varying(10) NOT NULL,
+    "turNumarasi" integer NOT NULL,
+    "turAdi" character varying(30)
+);
+
+
+ALTER TABLE public."turSite" OWNER TO postgres;
+
+--
+-- Data for Name: apartman; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.apartman VALUES
+	('1001', 'Sabır', NULL, '1751', '12345678910'),
+	('1002', 'Kırkıt', NULL, '1752', '14774136996'),
+	('1004', 'Erkıran', NULL, '1751', '14789632147'),
+	('1000', 'Özgöller', 'Nuripaşa Mahallesi 10. sokak no:15 daire:3', '1751', '11223344556'),
+	('1003', 'Kaya', 'Sümer Mahallesi 21.sokak no:4 daire 8', '1753', '15995135775');
+
+
+--
+-- Data for Name: apartmanTuru; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public."apartmanTuru" VALUES
+	('0001', 3, 1),
+	('0002', 2, 1),
+	('0003', 1, 1),
+	('0004', 3, 0),
+	('0005', 2, 0);
+
+
+--
+-- Data for Name: daire; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.daire VALUES
+	('1', 'Ali''nin Dairesi', '1000', '11223344556'),
+	('3', 'Elanur''un Dairesi', '1001', '15995135775'),
+	('4', 'Yusuf''un Dairesi', '1003', '14774136996'),
+	('5', 'Osman''ın Dairesi', '1002', '12345678910'),
+	('2', 'Ahmet''in Dairesi', '1004', '14789632145'),
+	('6', 'Çetin''in Dairesi', '1000', '25874136990'),
+	('7', 'Cevahir''in Dairesi', '1004', '85469712345'),
+	('9', 'Fatma''nın Dairesi', '1001', '15823974594'),
+	('10', 'Ayşe''nin Dairesi', '1003', '48571823649'),
+	('11', 'Mehmet''in Dairesi', '1000', '83612384687'),
+	('12', 'Sıla''nın Dairesi', '1001', '56874169851'),
+	('13', 'Songül''ün Dairesi', '1004', '38752114538'),
+	('14', 'Aleyna''nın Dairesi', '1003', '68794512364'),
+	('15', 'Semih''in Dairesi', '1002', '28984422877'),
+	('8', 'Ulvi''nin Dairesi', '1002', '75698412341');
+
+
+--
+-- Data for Name: daireSahibi; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public."daireSahibi" VALUES
+	('11223344556', 'Ali ', 'Seven', '1000', 1),
+	('12345678910', 'Osman', 'Kaya', '1002', 2),
+	('14774136996', 'Yusuf', 'Biber', '1003', 3),
+	('14789632145', 'Ahmet', 'Uyar', '1004', 4),
+	('15823974594', 'Fatma', 'Kırcı', '1001', 5),
+	('15995135775', 'Elanur', 'Kırar', '1001', 6),
+	('25874136990', 'Çetin', 'Turan', '1000', 7),
+	('28984422877', 'Semih', 'Yaman', '1002', 8),
+	('38752114538', 'Songül', 'Işıl', '1004', 9),
+	('48571823649', 'Ayşe', 'Cevher', '1003', 10),
+	('56874169851', 'Sıla', 'Gürbüz', '1001', 11),
+	('68794512364', 'Aleyna', 'Erdal', '1003', 12),
+	('75698412341', 'Ulvi', 'Destanoğlu', '1002', 13),
+	('83612384687', 'Mehmet', 'Teker', '1000', 14),
+	('85469712345', 'Cevahir', 'Yılmaz', '1004', 15),
+	('94698721257', 'Taner', 'Semih', '1000', 16),
+	('95213698515', 'Alya', 'Güleryüz', '1004', 17),
+	('95423671515', 'Sena', 'Karakaş', '1003', 18);
+
+
+--
+-- Data for Name: daireSahibiSayisi; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public."daireSahibiSayisi" VALUES
+	(20);
+
+
+--
+-- Data for Name: daireSahibiUzunlugu; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public."daireSahibiUzunlugu" VALUES
+	(4);
+
+
+--
+-- Data for Name: daireTuru; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public."daireTuru" VALUES
+	('0001', 3, 3),
+	('0002', 2, 2),
+	('0003', 1, 1),
+	('0004', 3, 2),
+	('0005', 2, 1),
+	('0006', 1, 0);
+
+
+--
+-- Data for Name: il; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.il VALUES
+	('0006', 'Ankara', 1),
+	('0034', 'İstanbul', 2),
+	('0035', 'İzmir', 3);
+
+
+--
+-- Data for Name: ilUzunlugu; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+
+
+--
+-- Data for Name: ilce; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.ilce VALUES
+	('3400', 'Zeytinburnu', '0034'),
+	('3500', 'Çeşme', '0035'),
+	('6000', 'Etimesgut', '0006'),
+	('3401', 'Bahçelievler', '0034');
+
+
+--
+-- Data for Name: kiraci; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.kiraci VALUES
+	('217       ', 'Gülseren', 'Bakıcı', '11223344556'),
+	('219       ', 'Ömer', 'Çelik', '14774136996'),
+	('220       ', 'Oğuz', 'Umut', '14789632145'),
+	('221       ', 'Gülcan', 'Alimi', '75698412341'),
+	('222       ', 'Arif', 'Patan', '83612384687'),
+	('218       ', 'Elanur', 'Bilge', '11223344556');
+
+
+--
+-- Data for Name: kiraciDegisikligi; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public."kiraciDegisikligi" VALUES
+	('218       ', 'Ela', 'Elanur', '2021-12-19 20:35:30.31518+03');
+
+
+--
+-- Data for Name: mahalle; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.mahalle VALUES
+	('0340', 'Nuripaşa', '0034', '3400'),
+	('0350', 'Sümer', '0035', '3500'),
+	('0060', 'Yeşiltepe', '0006', '6000'),
+	('0341', 'Yusufpaşa', '0034', '3400'),
+	('0351', 'Tatlıcı', '0035', '3500'),
+	('0061', 'Hatip', '0006', '6000'),
+	('0342', 'Yenidoğan', '0034', '3400');
+
+
+--
+-- Data for Name: personel; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.personel VALUES
+	('1385      ', 'Halit', 'Köklü', '05346058798', '1751'),
+	('1386      ', 'Melik', 'Coşar', '05428799662', '1751'),
+	('1387      ', 'Sıla', 'Seven', '05325648791', '1752'),
+	('1388      ', 'Tuğçe', 'Kutlu', '05478921156', '1752'),
+	('1389      ', 'Gamze', 'Özden', '05556214578', '1753');
+
+
+--
+-- Data for Name: site; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.site VALUES
+	('1752', 'Özseven', NULL, '0035', '3500', '0350'),
+	('1753', 'Zengin', 'Sümer Mahallesi 21.sokak no:4 ', '0006', '6000', '0060'),
+	('1751', 'Güler', 'Nuripaşa Mahallesi 10. sokak no:15 ', '0034', '3400', '0340');
+
+
+--
+-- Data for Name: siteTuru; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public."siteTuru" VALUES
+	(1, 3, 2),
+	(2, 2, 1),
+	(3, 1, 0),
+	(4, 2, 2),
+	(5, 1, 1);
+
+
+--
+-- Data for Name: turApartman; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public."turApartman" VALUES
+	('1000', '0001', 'Havuzlu'),
+	('1001', '0002', 'Havuzlu'),
+	('1002', '0003', 'Havuzlu'),
+	('1003', '0004', 'Havuzsuz'),
+	('1004', '0005', 'Havuzsuz');
+
+
+--
+-- Data for Name: turDaire; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public."turDaire" VALUES
+	('1', '0001', 'Salonlu ve banyolu'),
+	('2', '0007', 'Salonlu ve banyosuz'),
+	('3', '0004', 'Salonlu ve banyolu'),
+	('4', '0005', 'Salonlu ve banyolu'),
+	('5', '0006', 'Salonlu ve banyosuz');
+
+
+--
+-- Data for Name: turSite; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public."turSite" VALUES
+	('1751', 1, '3 binalı ve 2 sahalı'),
+	('1752', 2, '2 binalı ve 1 sahalı'),
+	('1753', 3, '1 binalı ve sahasız');
+
+
+--
+-- Name: siteTuru siteTuru_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."siteTuru"
+    ADD CONSTRAINT "siteTuru_pkey" PRIMARY KEY ("turNumarasi");
+
+
+--
+-- Name: site site_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.site
+    ADD CONSTRAINT site_pkey PRIMARY KEY ("siteNo");
+
+
+--
+-- Name: turApartman turApartman_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."turApartman"
+    ADD CONSTRAINT "turApartman_pkey" PRIMARY KEY ("apartmanNo", "turKodu");
+
+
+--
+-- Name: turDaire turDaire_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."turDaire"
+    ADD CONSTRAINT "turDaire_pkey" PRIMARY KEY ("daireNo", "turNo");
+
+
+--
+-- Name: turSite turSite_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."turSite"
+    ADD CONSTRAINT "turSite_pkey" PRIMARY KEY ("siteNo", "turNumarasi");
+
+
+--
+-- Name: apartmanTuru unique_apartmanTuru_turKodu; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."apartmanTuru"
+    ADD CONSTRAINT "unique_apartmanTuru_turKodu" PRIMARY KEY ("turKodu");
+
+
+--
+-- Name: apartman unique_apartman_apartmanNo; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.apartman
+    ADD CONSTRAINT "unique_apartman_apartmanNo" PRIMARY KEY ("apartmanNo");
+
+
+--
+-- Name: daireSahibiUzunlugu unique_daireSahibiUzunlugu_uzunlukSayisi; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."daireSahibiUzunlugu"
+    ADD CONSTRAINT "unique_daireSahibiUzunlugu_uzunlukSayisi" UNIQUE ("uzunlukSayisi");
+
+
+--
+-- Name: daireSahibi unique_daireSahibi_kimlikNo; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."daireSahibi"
+    ADD CONSTRAINT "unique_daireSahibi_kimlikNo" PRIMARY KEY ("kimlikNo");
+
+
+--
+-- Name: daireTuru unique_daireTuru_turNo; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."daireTuru"
+    ADD CONSTRAINT "unique_daireTuru_turNo" PRIMARY KEY ("turNo");
+
+
+--
+-- Name: daire unique_daire_daireNo; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.daire
+    ADD CONSTRAINT "unique_daire_daireNo" UNIQUE ("daireNo");
+
+
+--
+-- Name: ilUzunlugu unique_ilUzunlugu_uzunlukMiktarı; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."ilUzunlugu"
+    ADD CONSTRAINT "unique_ilUzunlugu_uzunlukMiktarı" UNIQUE ("uzunlukMiktarı");
+
+
+--
+-- Name: il unique_il_ilKodu; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.il
+    ADD CONSTRAINT "unique_il_ilKodu" PRIMARY KEY ("ilKodu");
+
+
+--
+-- Name: il unique_il_siraNumarasi; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.il
+    ADD CONSTRAINT "unique_il_siraNumarasi" UNIQUE ("siraNumarasi");
+
+
+--
+-- Name: ilce unique_ilce_ilceKodu; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.ilce
+    ADD CONSTRAINT "unique_ilce_ilceKodu" PRIMARY KEY ("ilceKodu");
+
+
+--
+-- Name: kiraciDegisikligi unique_kiraciDegisikligiIzle_sozlesmeNumarasi; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."kiraciDegisikligi"
+    ADD CONSTRAINT "unique_kiraciDegisikligiIzle_sozlesmeNumarasi" PRIMARY KEY ("sozlesmeNumarasi");
+
+
+--
+-- Name: kiraci unique_kiraci_sozlesmeNo; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kiraci
+    ADD CONSTRAINT "unique_kiraci_sozlesmeNo" PRIMARY KEY ("sozlesmeNo");
+
+
+--
+-- Name: mahalle unique_mahalle_mahalleKodu; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mahalle
+    ADD CONSTRAINT "unique_mahalle_mahalleKodu" PRIMARY KEY ("mahalleKodu");
+
+
+--
+-- Name: personel unique_personel_sicilNo; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.personel
+    ADD CONSTRAINT "unique_personel_sicilNo" PRIMARY KEY ("sicilNo");
+
+
+--
+-- Name: site unique_site_siteNo; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.site
+    ADD CONSTRAINT "unique_site_siteNo" UNIQUE ("siteNo");
+
+
+--
+-- Name: turApartman unique_turApartman_apartmanNo; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."turApartman"
+    ADD CONSTRAINT "unique_turApartman_apartmanNo" UNIQUE ("apartmanNo");
+
+
+--
+-- Name: turApartman unique_turApartman_turKodu; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."turApartman"
+    ADD CONSTRAINT "unique_turApartman_turKodu" UNIQUE ("turKodu");
+
+
+--
+-- Name: turDaire unique_turDaire_daireNo; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."turDaire"
+    ADD CONSTRAINT "unique_turDaire_daireNo" UNIQUE ("daireNo");
+
+
+--
+-- Name: turDaire unique_turDaire_turNo; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."turDaire"
+    ADD CONSTRAINT "unique_turDaire_turNo" UNIQUE ("turNo");
+
+
+--
+-- Name: turSite unique_turSite_siteNo; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."turSite"
+    ADD CONSTRAINT "unique_turSite_siteNo" UNIQUE ("siteNo");
+
+
+--
+-- Name: turSite unique_turSite_turNumarasi; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."turSite"
+    ADD CONSTRAINT "unique_turSite_turNumarasi" UNIQUE ("turNumarasi");
+
+
+--
+-- Name: index_apartmanNo; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_apartmanNo" ON public."turApartman" USING btree ("apartmanNo");
+
+
+--
+-- Name: index_apartmanNumarasi; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_apartmanNumarasi" ON public."daireSahibi" USING btree ("apartmanNumarasi");
+
+
+--
+-- Name: index_apartmanNumarasi1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_apartmanNumarasi1" ON public.daire USING btree ("apartmanNumarasi");
+
+
+--
+-- Name: index_daireNo; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_daireNo" ON public."turDaire" USING btree ("daireNo");
+
+
+--
+-- Name: index_ilNo; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_ilNo" ON public.site USING btree ("ilNo");
+
+
+--
+-- Name: index_ilNo1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_ilNo1" ON public.mahalle USING btree ("ilNo");
+
+
+--
+-- Name: index_ilNo2; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_ilNo2" ON public.ilce USING btree ("ilNo");
+
+
+--
+-- Name: index_ilceNo; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_ilceNo" ON public.site USING btree ("ilceNo");
+
+
+--
+-- Name: index_ilceNo1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_ilceNo1" ON public.mahalle USING btree ("ilceNo");
+
+
+--
+-- Name: index_kimlikNumarasi; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_kimlikNumarasi" ON public.kiraci USING btree ("kimlikNumarasi");
+
+
+--
+-- Name: index_kimlikNumarasi1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_kimlikNumarasi1" ON public.daire USING btree ("kimlikNumarasi");
+
+
+--
+-- Name: index_kimlikNumarasi2; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_kimlikNumarasi2" ON public.apartman USING btree ("kimlikNumarasi");
+
+
+--
+-- Name: index_mahalleNo; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_mahalleNo" ON public.site USING btree ("mahalleNo");
+
+
+--
+-- Name: index_siteNo; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_siteNo" ON public."turSite" USING btree ("siteNo");
+
+
+--
+-- Name: index_siteNumarasi; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_siteNumarasi" ON public.personel USING btree ("siteNumarasi");
+
+
+--
+-- Name: index_siteNumarasi1; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX "index_siteNumarasi1" ON public.apartman USING btree ("siteNumarasi");
+
+
+--
+-- Name: il ilHarfUzunlugu; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER "ilHarfUzunlugu" AFTER INSERT ON public.il FOR EACH ROW EXECUTE FUNCTION public."ilUzunluguTrigger"();
+
+
+--
+-- Name: kiraci kiraciAdiDegistiginde; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER "kiraciAdiDegistiginde" BEFORE UPDATE ON public.kiraci FOR EACH ROW EXECUTE FUNCTION public."kiraciAdiTrigger"();
+
+
+--
+-- Name: daireSahibi sayiDegistiginde; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER "sayiDegistiginde" AFTER INSERT ON public."daireSahibi" FOR EACH ROW EXECUTE FUNCTION public."daireSahibiTrigger"();
+
+
+--
+-- Name: daireSahibi uzunlukMiktari; Type: TRIGGER; Schema: public; Owner: postgres
+--
+
+CREATE TRIGGER "uzunlukMiktari" AFTER INSERT ON public."daireSahibi" FOR EACH ROW EXECUTE FUNCTION public."uzunlukTrigger"();
+
+
+--
+-- Name: daire apartmanDaireFK; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.daire
+    ADD CONSTRAINT "apartmanDaireFK" FOREIGN KEY ("apartmanNumarasi") REFERENCES public.apartman("apartmanNo") MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: daireSahibi apartmanDaireSFK; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public."daireSahibi"
+    ADD CONSTRAINT "apartmanDaireSFK" FOREIGN KEY ("apartmanNumarasi") REFERENCES public.apartman("apartmanNo") MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: daire daireDaireSFK; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.daire
+    ADD CONSTRAINT "daireDaireSFK" FOREIGN KEY ("kimlikNumarasi") REFERENCES public."daireSahibi"("kimlikNo") MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: ilce ilceilFK; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.ilce
+    ADD CONSTRAINT "ilceilFK" FOREIGN KEY ("ilNo") REFERENCES public.il("ilKodu") MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: kiraci kiraciDaireSFK; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.kiraci
+    ADD CONSTRAINT "kiraciDaireSFK" FOREIGN KEY ("kimlikNumarasi") REFERENCES public."daireSahibi"("kimlikNo") MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: mahalle mahalleilFK; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mahalle
+    ADD CONSTRAINT "mahalleilFK" FOREIGN KEY ("ilNo") REFERENCES public.il("ilKodu") MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: mahalle mahalleilceFK; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.mahalle
+    ADD CONSTRAINT "mahalleilceFK" FOREIGN KEY ("ilceNo") REFERENCES public.ilce("ilceKodu") MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: apartman siteApartmanFK; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.apartman
+    ADD CONSTRAINT "siteApartmanFK" FOREIGN KEY ("siteNumarasi") REFERENCES public.site("siteNo") MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: site siteMahalleFK; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.site
+    ADD CONSTRAINT "siteMahalleFK" FOREIGN KEY ("mahalleNo") REFERENCES public.mahalle("mahalleKodu") MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: personel sitePersonelFK; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.personel
+    ADD CONSTRAINT "sitePersonelFK" FOREIGN KEY ("siteNumarasi") REFERENCES public.site("siteNo") MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: site siteilFK; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.site
+    ADD CONSTRAINT "siteilFK" FOREIGN KEY ("ilNo") REFERENCES public.il("ilKodu") MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: site siteilceFK; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.site
+    ADD CONSTRAINT "siteilceFK" FOREIGN KEY ("ilceNo") REFERENCES public.ilce("ilceKodu") MATCH FULL ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- PostgreSQL database dump complete
+--
+
